@@ -61,7 +61,6 @@ class UsersWatchedInterface(Interface):
         if type(items) is not list:
             return None
 
-        print(media)
         return SyncMapper.process(
             self.client, store, items,
             media=media,
@@ -72,6 +71,7 @@ class UsersWatchedInterface(Interface):
     #
     # Shortcut methods
     #
+
     def movies(self, username, store=None, **kwargs):
         return self.get(
             username, 'movies',

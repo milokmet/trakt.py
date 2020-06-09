@@ -1,11 +1,12 @@
 from __future__ import absolute_import, division, print_function
 
 from trakt.mapper.core.base import Mapper
+from trakt.mapper.user import UserMapper
 
 
 class ListMapper(Mapper):
     @classmethod
-    def custom_list(cls, client, item, **kwargs):
+    def custom_list(cls, client, item, username=None, **kwargs):
         if 'list' in item:
             i_list = item['list']
         else:
@@ -17,8 +18,18 @@ class ListMapper(Mapper):
         if pk is None:
             return None
 
-        # Create object
-        custom_list = cls.construct(client, 'custom_list', i_list, keys, **kwargs)
+        # Retrieve user details
+        i_user = i_list.get('user') or {}
+
+        if username:
+            i_user.setdefault('username', username)
+
+        # Create list
+        custom_list = cls.construct(
+            client, 'custom_list', i_list, keys,
+            user=UserMapper.user(client, i_user),
+            **kwargs
+        )
 
         # Update with root info
         if 'list' in item:
@@ -27,15 +38,14 @@ class ListMapper(Mapper):
         return custom_list
 
     @classmethod
-    def lists(cls, client, items, **kwargs):
+    def public_lists(cls, client, items, **kwargs):
         if not items:
             return None
 
         return [
-            item for item in [ListMapper.public_list(client, item) for item in items]
+            cls.public_list(client, item, **kwargs) for item in items
             if item
         ]
-        print(items)
 
     @classmethod
     def public_list(cls, client, item, **kwargs):
@@ -44,11 +54,33 @@ class ListMapper(Mapper):
         else:
             i_list = item
 
-        pk, keys = cls.get_ids('list', i_list)
+        # Retrieve item keys
+        pk, keys = cls.get_ids('public_list', i_list)
 
-        public_list = cls.construct(client, 'list', i_list, keys, **kwargs)
+        if pk is None:
+            return None
 
+        # Retrieve totals
+        comment_total = i_list.get('comment_count')
+        like_total = i_list.get('likes')
+
+        # Create list
+        public_list = cls.construct(
+            client, 'public_list', i_list, keys,
+            user=UserMapper.user(client, i_list['user']),
+            **kwargs
+        )
+
+        public_list._update({
+            'comment_total': comment_total,
+            'like_total': like_total
+        })
+
+        # Update with root info
         if 'list' in item:
-            public_list._update(item)
+            info = item.copy()
+            info['likes'] = info.pop('like_count')
+
+            public_list._update(info)
 
         return public_list
